@@ -29,8 +29,10 @@ description: |
 - [CI/CD 集成](#cicd-集成)
   - [Git Hook](#git-hook)
   - [流水线脚本](#流水线脚本)
+- [生态集成](#生态集成)
 - [技术说明](#技术说明)
 - [文件清单](#文件清单)
+- [分享与分发](#分享与分发)
 
 ---
 
@@ -407,6 +409,22 @@ fi
 
 ---
 
+## 生态集成
+
+本技能可与社区已有项目组合，扩展词库规模、匹配精度和检测深度。详见 [references/integration-guide.md](references/integration-guide.md)。
+
+**快速索引：**
+
+| 需求 | 集成项目 | 方式 |
+|------|---------|------|
+| 挂载大词库（万级词汇） | [Sensitive-lexicon](https://github.com/konsheng/Sensitive-lexicon) | `--custom` 参数 |
+| 高性能匹配 | [houbb/sensitive-word](https://github.com/houbb/sensitive-word) | `--engine ac` 引入 pyahocorasick |
+| 防全角/繁体绕过 | OpenCC + 标准库 | 字符归一化预处理 |
+| ML 语义二次审核 | [Chinese-offensive-language-detect](https://github.com/royal12646/Chinese-offensive-language-detect) | 后置 ML 审核层 |
+| Claude Code 协同 | [glin-profanity-mcp](https://mcprepository.com/GLINCKER/glin-profanity) | settings.json 并排配置 |
+
+---
+
 ## 技术说明
 
 **扫描范围：**
@@ -434,8 +452,11 @@ fi
 ```
 sensitive-word-check/
 ├── SKILL.md                    # 本手册（Claude Code 技能定义）
+├── README.md                   # 项目主页 README
+├── .gitignore
 ├── references/
-│   └── words.json              # 敏感词词库（v2.0，含维度体系）
+│   ├── words.json              # 敏感词词库（v2.0，含维度体系）
+│   └── integration-guide.md    # 生态集成指南
 └── scripts/
     ├── check.py                # 扫描检查脚本
     ├── fix.py                  # 预览替换脚本
