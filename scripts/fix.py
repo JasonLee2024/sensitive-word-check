@@ -6,40 +6,23 @@
 
 import argparse
 import json
-import os
 import sys
+import time
 from pathlib import Path
 
-# 同 check.py 的白名单和排除目录
-DEFAULT_EXTENSIONS = {".md", ".py", ".js", ".ts", ".html", ".css", ".yaml", ".yml", ".json", ".txt", ".java", ".go", ".rs", ".c", ".cpp", ".sh", ".ps1", ".xml", ".toml", ".ini", ".cfg", ".conf"}
-DEFAULT_EXCLUDE_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".obsidian", ".trash", ".claude", "dist", "build", "target"}
-
-
-def load_rules(words_path: str) -> list[dict]:
-    path = Path(words_path)
-    if not path.exists():
-        print(f"错误：词库文件不存在 — {path}")
-        sys.exit(1)
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("rules", [])
-
-
-def should_scan(filepath: Path, extensions: set, exclude_dirs: set, exclude_files: set) -> bool:
-    fname = filepath.name
-    if fname in exclude_files:
-        return False
-    if filepath.suffix.lower() not in extensions:
-        return False
-    for part in filepath.parts:
-        if part in exclude_dirs:
-            return False
-    try:
-        if filepath.stat().st_size > 10 * 1024 * 1024:
-            return False
-    except Exception:
-        return False
-    return True
+from common import (
+    DEFAULT_EXTENSIONS,
+    DEFAULT_EXCLUDE_DIRS,
+    SKIP_COMMENT,
+    build_exclude_dirs,
+    build_exclude_files,
+    build_extensions,
+    line_should_skip,
+    load_rules,
+    normalize,
+    resolve_words_path,
+    should_scan,
+)
 
 
 def preview_changes(target_dir: str, rules: list[dict], extensions: set, exclude_dirs: set, exclude_files: set) -> dict:
@@ -50,19 +33,24 @@ def preview_changes(target_dir: str, rules: list[dict], extensions: set, exclude
 
     for fpath in sorted(files):
         try:
-            content = fpath.read_text(encoding="utf-8", errors="ignore")
+            raw = fpath.read_text(encoding="utf-8", errors="ignore")
         except Exception:
             continue
 
+        content = normalize(raw)
+        lines = content.split("\n")
+
         changes = []
-        new_content = content
         for rule in rules:
             word = rule["word"]
-            replacement = rule["replacements"][0]  # 默认使用第一个替代词
-            if word in new_content:
-                count = new_content.count(word)
+            replacement = rule["replacements"][0]
+            # 只统计非跳过行中的出现次数
+            count = 0
+            for line in lines:
+                if not line_should_skip(line) and word in line:
+                    count += line.count(word)
+            if count > 0:
                 changes.append({"word": word, "replacement": replacement, "count": count})
-                new_content = new_content.replace(word, replacement)
 
         if changes:
             rel = str(fpath.relative_to(base))
@@ -82,18 +70,30 @@ def apply_fixes(target_dir: str, rules: list[dict], extensions: set, exclude_dir
 
     for fpath in sorted(files):
         try:
-            content = fpath.read_text(encoding="utf-8", errors="ignore")
+            raw = fpath.read_text(encoding="utf-8", errors="ignore")
         except Exception:
             continue
 
-        new_content = content
-        for rule in rules:
-            word = rule["word"]
-            replacement = rule["replacements"][0]
-            new_content = new_content.replace(word, replacement)
+        content = normalize(raw)
+        lines = content.split("\n")
 
-        if new_content != content:
-            fpath.write_text(new_content, encoding="utf-8")
+        new_lines = []
+        changed = False
+        for line in lines:
+            if line_should_skip(line):
+                new_lines.append(line)
+            else:
+                new_line = line
+                for rule in rules:
+                    word = rule["word"]
+                    replacement = rule["replacements"][0]
+                    if word in new_line:
+                        new_line = new_line.replace(word, replacement)
+                        changed = True
+                new_lines.append(new_line)
+
+        if changed:
+            fpath.write_text("\n".join(new_lines), encoding="utf-8")
             modified.append(str(fpath.relative_to(base)))
 
     return modified
@@ -346,27 +346,12 @@ def main():
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
-    default_words = script_dir.parent / "references" / "words.json"
-    words_path = args.custom or default_words
-    rules = load_rules(str(words_path))
+    words_path = resolve_words_path(args.custom, script_dir)
+    rules = load_rules(words_path)
 
-    extensions = DEFAULT_EXTENSIONS.copy()
-    if args.ext:
-        for ext in args.ext.split(","):
-            ext = ext.strip()
-            if not ext.startswith("."):
-                ext = f".{ext}"
-            extensions.add(ext)
-
-    exclude_dirs = DEFAULT_EXCLUDE_DIRS.copy()
-    if args.exclude:
-        for d in args.exclude.split(","):
-            exclude_dirs.add(d.strip())
-
-    exclude_files = set()
-    if args.exclude_file:
-        for f in args.exclude_file.split(","):
-            exclude_files.add(f.strip())
+    extensions = build_extensions(args.ext, DEFAULT_EXTENSIONS)
+    exclude_dirs = build_exclude_dirs(args.exclude, DEFAULT_EXCLUDE_DIRS)
+    exclude_files = build_exclude_files(args.exclude_file)
 
     # 预览
     import time

@@ -6,59 +6,24 @@
 
 import argparse
 import json
-import os
 import sys
+import time
 from pathlib import Path
 
-# 文件扩展名白名单
-DEFAULT_EXTENSIONS = {".md", ".py", ".js", ".ts", ".html", ".css", ".yaml", ".yml", ".json", ".txt", ".java", ".go", ".rs", ".c", ".cpp", ".sh", ".ps1", ".xml", ".toml", ".ini", ".cfg", ".conf"}
-
-# 默认排除目录
-DEFAULT_EXCLUDE_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".obsidian", ".trash", ".claude", "dist", "build", "target"}
-
-
-def load_rules(words_path: str) -> list[dict]:
-    """加载敏感词规则"""
-    path = Path(words_path)
-    if not path.exists():
-        print(f"错误：词库文件不存在 — {path}")
-        sys.exit(1)
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("rules", [])
-
-
-def load_dimensions(words_path: str) -> dict | None:
-    """加载维度定义"""
-    path = Path(words_path)
-    if not path.exists():
-        return None
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("dimensions", None)
-
-
-def should_scan(filepath: Path, extensions: set, exclude_dirs: set, exclude_files: set) -> bool:
-    """判断文件是否需要扫描"""
-    # 检查是否在排除文件列表中（按文件名或相对路径匹配）
-    fname = filepath.name
-    if fname in exclude_files:
-        return False
-    # 检查扩展名
-    if filepath.suffix.lower() not in extensions:
-        return False
-    # 检查是否在排除目录中
-    for part in filepath.parts:
-        if part in exclude_dirs:
-            return False
-    # 跳过二进制大文件
-    try:
-        size = filepath.stat().st_size
-        if size > 10 * 1024 * 1024:  # 10MB
-            return False
-    except Exception:
-        return False
-    return True
+from common import (
+    DEFAULT_EXTENSIONS,
+    DEFAULT_EXCLUDE_DIRS,
+    SKIP_COMMENT,
+    build_exclude_dirs,
+    build_exclude_files,
+    build_extensions,
+    line_should_skip,
+    load_dimensions,
+    load_rules,
+    normalize,
+    resolve_words_path,
+    should_scan,
+)
 
 
 def scan_directory(target_dir: str, rules: list[dict], extensions: set, exclude_dirs: set, exclude_files: set) -> tuple[list[dict], int]:
@@ -75,14 +40,21 @@ def scan_directory(target_dir: str, rules: list[dict], extensions: set, exclude_
 
     for fpath in sorted(files):
         try:
-            lines = fpath.read_text(encoding="utf-8", errors="ignore").split("\n")
+            raw = fpath.read_text(encoding="utf-8", errors="ignore")
         except Exception:
             files_scanned -= 1
             continue
 
+        # NFKC 归一化：全角 ASCII → 半角，兼容字符 → 标准形式
+        normalized = normalize(raw)
+        lines = normalized.split("\n")
+
         for rule in rules:
             word = rule["word"]
             for i, line in enumerate(lines, 1):
+                # 行内跳过标记
+                if line_should_skip(line):
+                    continue
                 if word in line:
                     violations.append({
                         "file": str(fpath.relative_to(base)),
@@ -485,8 +457,7 @@ def main():
 
     # 加载词库
     script_dir = Path(__file__).resolve().parent
-    default_words = script_dir.parent / "references" / "words.json"
-    words_path = args.custom or default_words
+    words_path = resolve_words_path(args.custom, script_dir)
     rules = load_rules(str(words_path))
     dimensions = load_dimensions(str(words_path))
 
@@ -500,29 +471,12 @@ def main():
         print("词库未定义维度体系（需要 words.json v2.0+），忽略 --group-by")
         group_by = None
 
-    # 构建扩展名集合
-    extensions = DEFAULT_EXTENSIONS.copy()
-    if args.ext:
-        for ext in args.ext.split(","):
-            ext = ext.strip()
-            if not ext.startswith("."):
-                ext = f".{ext}"
-            extensions.add(ext)
-
-    # 构建排除目录集合
-    exclude_dirs = DEFAULT_EXCLUDE_DIRS.copy()
-    if args.exclude:
-        for d in args.exclude.split(","):
-            exclude_dirs.add(d.strip())
-
-    # 构建排除文件集合
-    exclude_files = set()
-    if args.exclude_file:
-        for f in args.exclude_file.split(","):
-            exclude_files.add(f.strip())
+    # 构建过滤配置
+    extensions = build_extensions(args.ext, DEFAULT_EXTENSIONS)
+    exclude_dirs = build_exclude_dirs(args.exclude, DEFAULT_EXCLUDE_DIRS)
+    exclude_files = build_exclude_files(args.exclude_file)
 
     # 扫描（计时）
-    import time
     t0 = time.monotonic()
     violations, files_scanned = scan_directory(args.target, rules, extensions, exclude_dirs, exclude_files)
     elapsed_ms = int((time.monotonic() - t0) * 1000)

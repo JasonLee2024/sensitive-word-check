@@ -33,6 +33,7 @@ description: |
 - [技术说明](#技术说明)
 - [文件清单](#文件清单)
 - [分享与分发](#分享与分发)
+- [变更记录](#变更记录)
 
 ---
 
@@ -451,13 +452,15 @@ fi
 
 ```
 sensitive-word-check/
+├── CHANGELOG.md                # 版本变更历史（Keep a Changelog 格式）
 ├── SKILL.md                    # 本手册（Claude Code 技能定义）
 ├── README.md                   # 项目主页 README
 ├── .gitignore
 ├── references/
-│   ├── words.json              # 敏感词词库（v2.0，含维度体系）
+│   ├── words.json              # 敏感词词库（v2.1，含维度体系）
 │   └── integration-guide.md    # 生态集成指南
 └── scripts/
+    ├── common.py               # 共享模块（常量、归一化、工具函数）
     ├── check.py                # 扫描检查脚本
     ├── fix.py                  # 预览替换脚本
     └── manage.py               # 词库管理脚本
@@ -520,3 +523,9 @@ scp ~/.claude/skills/sensitive-word-check/references/words.json user@host:~/.cla
 ```
 
 维度自动扩展机制确保接收方后续自行添加新词时不会与你共享的维度值冲突。
+
+---
+
+## 变更记录
+
+完整的版本变更历史请见 [CHANGELOG.md](CHANGELOG.md)，遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 格式。

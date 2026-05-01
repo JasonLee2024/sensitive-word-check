@@ -66,6 +66,9 @@ def auto_extend_dimensions(data: dict, rule_dimensions: dict) -> list[str]:
                 "values": {},
             }
 
+        # "unclassified" 是系统默认值，不需要加入维度目录
+        if dim_value == "unclassified":
+            continue
         values = dims_catalog[dim_key].get("values", {})
         if dim_value not in values:
             # 自动为新维度值生成标签
@@ -111,7 +114,6 @@ def _print_rule(rule: dict, index: int, dims: dict | None = None):
             label = dims.get(k, {}).get("values", {}).get(v, v)
             dim_tags.append(f"{k}={v}")
         print(f"     维度: {', '.join(dim_tags)}")
-    print(f"     语境: {rule.get('context', '-')}")
     print(f"     说明: {rule.get('note', '-')}")
 
 
@@ -171,7 +173,6 @@ def cmd_add(
     words_path: Path,
     word: str,
     replacements: list[str],
-    context: str = "general",
     note: str = "",
     risk_type: str | None = None,
     domain: str | None = None,
@@ -185,29 +186,24 @@ def cmd_add(
         print(f"错误：「{word}」已存在于词库中。使用 update 命令修改。")
         sys.exit(1)
 
+    dims = {
+        "risk_type": risk_type or "unclassified",
+        "domain": domain or "unclassified",
+        "severity": severity or "unclassified",
+    }
+
     entry: dict = {
         "word": word,
         "replacements": replacements,
-        "context": context,
         "note": note,
+        "dimensions": dims,
     }
 
-    # 添加维度
-    if risk_type or domain or severity:
-        dims = {}
-        if risk_type:
-            dims["risk_type"] = risk_type
-        if domain:
-            dims["domain"] = domain
-        if severity:
-            dims["severity"] = severity
-        entry["dimensions"] = dims
-
-        # 自动扩展维度目录
-        new_dims = auto_extend_dimensions(data, dims)
-        if new_dims:
-            for nd in new_dims:
-                print(f"📝 自动扩展维度目录：{nd}（可在 words.json 中修改描述）")
+    # 自动扩展维度目录
+    new_dims = auto_extend_dimensions(data, dims)
+    if new_dims:
+        for nd in new_dims:
+            print(f"📝 自动扩展维度目录：{nd}（可在 words.json 中修改描述）")
 
     rules.append(entry)
     data["rules"] = rules
@@ -235,7 +231,6 @@ def cmd_update(
     words_path: Path,
     word: str,
     replacements: list[str] | None = None,
-    context: str | None = None,
     note: str | None = None,
     risk_type: str | None = None,
     domain: str | None = None,
@@ -252,8 +247,6 @@ def cmd_update(
 
     if replacements:
         rules[idx]["replacements"] = replacements
-    if context is not None:
-        rules[idx]["context"] = context
     if note is not None:
         rules[idx]["note"] = note
 
@@ -266,6 +259,10 @@ def cmd_update(
             dims["domain"] = domain
         if severity:
             dims["severity"] = severity
+        # 确保三个维度键都存在
+        for key in ("risk_type", "domain", "severity"):
+            if key not in dims:
+                dims[key] = "unclassified"
         rules[idx]["dimensions"] = dims
 
         # 自动扩展维度目录
@@ -300,7 +297,6 @@ def main():
     p_add = sub.add_parser("add", help="添加敏感词")
     p_add.add_argument("word", help="敏感词")
     p_add.add_argument("-r", "--replacements", required=True, help="替代词，逗号分隔")
-    p_add.add_argument("--context", default="general", help="语境分类 (默认 general)")
     p_add.add_argument("--note", default="", help="替换理由/备注")
     p_add.add_argument("--risk-type", help="风险类型: security / privacy / legal")
     p_add.add_argument("--domain", help="语义领域: intelligence / surveillance / data_collection / cyber")
@@ -314,7 +310,6 @@ def main():
     p_up = sub.add_parser("update", help="更新敏感词")
     p_up.add_argument("word", help="要更新的敏感词")
     p_up.add_argument("-r", "--replacements", help="新的替代词，逗号分隔")
-    p_up.add_argument("--context", help="新的语境分类")
     p_up.add_argument("--note", help="新的说明/备注")
     p_up.add_argument("--risk-type", help="修改风险类型")
     p_up.add_argument("--domain", help="修改语义领域")
@@ -347,7 +342,7 @@ def main():
         case "add":
             replacements = [r.strip() for r in args.replacements.split(",")]
             cmd_add(
-                words_path, args.word, replacements, args.context, args.note,
+                words_path, args.word, replacements, args.note,
                 risk_type=getattr(args, "risk_type", None),
                 domain=getattr(args, "domain", None),
                 severity=getattr(args, "severity", None),
@@ -359,7 +354,7 @@ def main():
             if args.replacements:
                 replacements = [r.strip() for r in args.replacements.split(",")]
             cmd_update(
-                words_path, args.word, replacements, args.context, args.note,
+                words_path, args.word, replacements, args.note,
                 risk_type=getattr(args, "risk_type", None),
                 domain=getattr(args, "domain", None),
                 severity=getattr(args, "severity", None),

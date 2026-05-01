@@ -31,57 +31,70 @@
   "rules": [
     {
       "word": "情报",
-      "replacements": ["洞察", "信息", "数据"],
+      "replacements": [
+        "洞察",
+        "信息",
+        "数据"
+      ],
       "dimensions": {
         "risk_type": "security",
         "domain": "intelligence",
         "severity": "high"
       },
-      "context": "general",
       "note": "espionage/intelligence 联想，在分析类语境用「洞察」，中性描述用「信息」，统计类用「数据」"
     },
     {
       "word": "监控",
-      "replacements": ["监测", "跟踪", "观察"],
+      "replacements": [
+        "监测",
+        "跟踪",
+        "观察"
+      ],
       "dimensions": {
         "risk_type": "security",
         "domain": "surveillance",
         "severity": "high"
       },
-      "context": "general",
       "note": "surveillance 联想，技术语境用「监测」，进度类用「跟踪」，通用用「观察」"
     },
     {
       "word": "抓取",
-      "replacements": ["采集", "提取", "获取"],
+      "replacements": [
+        "采集",
+        "提取",
+        "获取"
+      ],
       "dimensions": {
         "risk_type": "privacy",
         "domain": "data_collection",
         "severity": "medium"
       },
-      "context": "data",
       "note": "data scraping 联想，数据收集用「采集」，信息提取用「提取」"
     },
     {
       "word": "爬虫",
-      "replacements": ["采集工具", "自动采集"],
+      "replacements": [
+        "采集工具",
+        "自动采集"
+      ],
       "dimensions": {
         "risk_type": "legal",
         "domain": "data_collection",
         "severity": "medium"
       },
-      "context": "tech",
       "note": "web crawler 联想，用功能性描述替代"
     },
     {
       "word": "窃取",
-      "replacements": ["提取", "读取"],
+      "replacements": [
+        "提取",
+        "读取"
+      ],
       "dimensions": {
         "risk_type": "legal",
         "domain": "cyber",
         "severity": "high"
       },
-      "context": "general",
       "note": "theft 联想，用技术性中性词替代"
     }
   ]
