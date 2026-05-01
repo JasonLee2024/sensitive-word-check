@@ -2,25 +2,90 @@
 
 Claude Code 技能 — 跨项目中文敏感词检查与修复。
 
-检测并替换项目中的敏感词汇（如情报、监控、抓取、爬虫、窃取），支持终端/Markdown/HTML/JSONL/log 五种报告格式、三维度自动聚类、CI/CD 集成。
+## 为什么需要这个工具
+
+在 vibe coding 时代，越来越多开发者通过 AI 代理来生成代码、撰写文档、编写注释。但在中文语境下，生成式 AI 产出的文本中会随机夹杂大量容易触发**误解**和**关键词拦截**的敏感词汇——情报、监控、抓取、爬虫、窃取等——这些词在日常技术文档中并无恶意，却可能给开发者带来不必要的审核麻烦甚至合规风险。
+
+这个技能的初衷就是解决这一问题：**在提交代码之前，自动扫描项目中的所有文件，发现敏感词、给出替代方案、一键替换**。无论你是在 GitHub 上维护开源项目、在公司内部提交 PR、还是用 AI 辅助生成文档，它都能帮你将风险消灭在 push 之前。
+
+## 它能做什么
+
+- **扫描检查**：递归扫描项目目录，列出每个敏感词所在的文件、行号、上下文，给出建议替换词
+- **一键修复**：预览变更 → 确认 → 批量替换，或 CI/CD 中静默自动修复
+- **五格式报告**：终端彩色、Markdown、HTML、JSONL、纯文本日志，满足人读和机器处理
+- **三维度聚类**：每个敏感词标注风险类型、语义领域、严重程度，支持多角度分组审视
+- **词库可控**：随时增删敏感词，维度自动扩展，也可临时使用自定义词库
+- **CI/CD 集成**：零依赖、非零退出码，一行命令即可接入 Git Hook 或流水线
+
+## 五个内置敏感词
+
+| 禁止词 | 替代词 | 风险类型 | 严重程度 |
+|--------|--------|---------|---------|
+| 情报 | 洞察 / 信息 / 数据 | 安全/情报类 | 高危 |
+| 监控 | 监测 / 跟踪 / 观察 | 安全/情报类 | 高危 |
+| 抓取 | 采集 / 提取 / 获取 | 隐私/数据类 | 中等 |
+| 爬虫 | 采集工具 / 自动采集 | 法律/合规类 | 中等 |
+| 窃取 | 提取 / 读取 | 法律/合规类 | 高危 |
+
+> 词库完全自定义，可随时增删。详见[完整文档](./SKILL.md)。
+
+## 安装
+
+```bash
+# 克隆到 Claude Code 技能目录
+git clone https://github.com/JasonLee2024/sensitive-word-check.git ~/.claude/skills/sensitive-word-check
+```
+
+无需安装任何依赖（纯 Python 标准库），clone 即用。
 
 ## 快速开始
 
 ```bash
-# 扫描当前目录
-python scripts/check.py /path/to/project
+# 扫描当前项目（终端彩色报告）
+python ~/.claude/skills/sensitive-word-check/scripts/check.py .
 
 # 按严重程度聚类扫描
-python scripts/check.py /path/to/project --group-by severity
+python ~/.claude/skills/sensitive-word-check/scripts/check.py . --group-by severity
 
-# 预览修复
-python scripts/fix.py /path/to/project --dry-run
+# 预览修复（不实际修改）
+python ~/.claude/skills/sensitive-word-check/scripts/fix.py . --dry-run
 
-# 管理词库
-python scripts/manage.py list
-python scripts/manage.py add "新词" -r "替代1,替代2" --severity high
+# 查看词库
+python ~/.claude/skills/sensitive-word-check/scripts/manage.py list
 ```
+
+在 Claude Code 中，直接使用斜杠命令：
+
+```
+/敏感词检查 .
+/敏感词修复 .
+```
+
+## 典型工作流
+
+```
+AI 生成了一堆代码和文档
+         │
+         ▼
+  /敏感词检查 .       ← 发现 12 处违规
+         │
+         ▼
+  /敏感词修复 --dry-run ← 预览要改什么
+         │
+         ▼
+  /敏感词修复 .       ← 确认执行，一键替换
+         │
+         ▼
+  git commit          ← 干净地提交
+```
+
+## 适用场景
+
+- **AI 辅助开发**：vibe coding / prompt 生成的项目，不确定 AI 塞了什么词
+- **开源项目维护**：避免无意中包含引发误解的词汇
+- **企业合规检查**：在 CI/CD 流水线中集成，阻断不合规内容进入仓库
+- **技术文档审查**：技术写作中自动替换不恰当的措辞
 
 ## 完整文档
 
-参见 [SKILL.md](./SKILL.md)
+[SKILL.md](./SKILL.md) — 包含全部命令行选项、审计输出格式说明、维度体系、词库管理命令、CI/CD 集成示例、分享分发指南。
